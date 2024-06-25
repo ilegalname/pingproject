@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('-pi', type=str, help='输入想ping的ip地址')
     parser.add_argument('-c', type=int, default=4, help='输入想ping的次数')
     parser.add_argument('-q', type=int, default=0, help='输入1只显示最后结果')
-    parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数')
+    parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数') 
     parser.add_argument('-I', type=str, default='', help='输入发送端ip')
     #parser.add_argument('--seed', type=int, default=72, help='Random seed.')
     #parser.add_argument('--epochs', type=int, default=10000, help='Number of epochs to train.')
