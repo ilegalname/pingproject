@@ -31,7 +31,7 @@ def request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, pa
     return icmp_packet
 
 
-def raw_socket(dst_addr, icmp_packet):
+def raw_socket(dst_addr, icmp_packet,host):
     '''
        连接套接字,并将数据发送到套接字
     '''
@@ -40,6 +40,11 @@ def raw_socket(dst_addr, icmp_packet):
     # 记录当前请求时间
     send_request_ping_time = time.time()
     # 发送数据到网络
+    host_addr = socket.gethostbyname(host)
+    rawsocket.bind((host_addr,0))
+    local_ip,local_port=rawsocket.getsockname()
+    print(local_ip)
+    print(local_port)
     rawsocket.sendto(icmp_packet, (dst_addr, 80))
     # 返回数据
     return send_request_ping_time, rawsocket, dst_addr
@@ -87,7 +92,7 @@ def dealtime(dst_addr, sumtime, shorttime, longtime, accept, i, time):
                 i + 1, accept, i + 1 - accept, (i + 1 - accept) / (i + 1) * 100, shorttime, longtime, sumtime))
 
 
-def ping(host,n=4,q=0,ti=0.7):
+def ping(dstn,n=4,q=0,ti=0.7,host=""):
     send, accept, lost = 0, 0, 0
     sumtime, shorttime, longtime, avgtime = 0, 1000, 0, 0
     # TODO icmp数据包的构建
@@ -97,16 +102,15 @@ def ping(host,n=4,q=0,ti=0.7):
     data_ID = 0  # Identifier
     data_Sequence = 1  # Sequence number
     payload_body = b'abcdefghijklmnopqrstuvwabcdefghi'  # data
-
     # 将主机名转ipv4地址格式，返回以ipv4地址格式的字符串，如果主机名称是ipv4地址，则它将保持不变
-    dst_addr = socket.gethostbyname(host)
-    print("正在 Ping {0} [{1}] 具有 32 字节的数据:".format(host, dst_addr))
+    dst_addr = socket.gethostbyname(dstn)
+    print("正在 Ping {0} [{1}] 具有 32 字节的数据:".format(dstn, dst_addr))
     for i in range(0, n):
         send = i + 1
         # 请求ping数据包的二进制转换
         icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body)
         # 连接套接字,并将数据发送到套接字
-        send_request_ping_time, rawsocket, addr = raw_socket(dst_addr, icmp_packet)
+        send_request_ping_time, rawsocket, addr = raw_socket(dst_addr, icmp_packet,host)
         # 数据包传输时间
         times = reply_ping(send_request_ping_time, rawsocket, data_Sequence + i)
         if times > 0:
@@ -140,11 +144,11 @@ if __name__ == "__main__":
     parser.add_argument('-c', type=int, default=4, help='输入想ping的次数')
     parser.add_argument('-q', type=int, default=0, help='输入1只显示最后结果')
     parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数')
-
+    parser.add_argument('-I', type=str, default='', help='输入发送端ip')
     #parser.add_argument('--seed', type=int, default=72, help='Random seed.')
     #parser.add_argument('--epochs', type=int, default=10000, help='Number of epochs to train.')
     args = parser.parse_args()
     #print(2)
     print(args.pi)
     print(args.c)
-    ping(args.pi,args.c,args.q,args.i)
+    ping(args.pi,args.c,args.q,args.i,args.I)
