@@ -5,6 +5,12 @@ import socket
 import select
 import argparse
 
+from random import randint
+#from scapy.all import *
+import ipaddress,threading
+from optparse import OptionParser
+from scapy.all import *
+
 def chesksum(data):
     n = len(data)
     m = n % 2
@@ -43,8 +49,8 @@ def raw_socket(dst_addr, icmp_packet,host):
     host_addr = socket.gethostbyname(host)
     rawsocket.bind((host_addr,0))
     local_ip,local_port=rawsocket.getsockname()
-    print(local_ip)
-    print(local_port)
+    #print(local_ip)
+    #print(local_port)S
     rawsocket.sendto(icmp_packet, (dst_addr, 80))
     # 返回数据
     return send_request_ping_time, rawsocket, dst_addr
@@ -92,7 +98,33 @@ def dealtime(dst_addr, sumtime, shorttime, longtime, accept, i, time):
                 i + 1, accept, i + 1 - accept, (i + 1 - accept) / (i + 1) * 100, shorttime, longtime, sumtime))
 
 
-def ping(dstn,n=4,q=0,ti=0.7,host=""):
+def TraceRouteTTL(r,dstn,timetolive=128):
+    i=1
+    for item in range(1, timetolive+1):
+        dst_addr = socket.gethostbyname(dstn)
+        RandomID = randint(1, 65534)
+        packet = IP(dst=dst_addr, ttl=item, id=RandomID) / ICMP(id=RandomID, seq=RandomID)
+        respon = sr1(packet, timeout=3, verbose=0)
+        if respon != None:
+            ip_src = str(respon[IP].src)
+            if ip_src != dst_addr:
+                if(r==1):
+                    print(i,". {}".format(str(respon[IP].src)))
+                    i=i+1
+            else:
+                if(r==1):
+                    print(i,". {} 已到达".format(str(respon[IP].src)))
+                    return 1
+        else:
+            if(r==1):
+                print(i,". TimeOut")
+                i=i+1
+        #time.sleep(1)
+    if(ip_src!=dst_addr):
+        return 0
+
+
+def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128):
     send, accept, lost = 0, 0, 0
     sumtime, shorttime, longtime, avgtime = 0, 1000, 0, 0
     # TODO icmp数据包的构建
@@ -105,7 +137,11 @@ def ping(dstn,n=4,q=0,ti=0.7,host=""):
     # 将主机名转ipv4地址格式，返回以ipv4地址格式的字符串，如果主机名称是ipv4地址，则它将保持不变
     dst_addr = socket.gethostbyname(dstn)
     print("正在 Ping {0} [{1}] 具有 32 字节的数据:".format(dstn, dst_addr))
+    reach=TraceRouteTTL(route,dstn,timetolive)
     for i in range(0, n):
+        if(reach==0):
+            print("can't reach, TTL is too small")
+            return 0
         send = i + 1
         # 请求ping数据包的二进制转换
         icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body)
@@ -145,10 +181,9 @@ if __name__ == "__main__":
     parser.add_argument('-q', type=int, default=0, help='输入1只显示最后结果')
     parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数') 
     parser.add_argument('-I', type=str, default='', help='输入发送端ip')
-    #parser.add_argument('--seed', type=int, default=72, help='Random seed.')
-    #parser.add_argument('--epochs', type=int, default=10000, help='Number of epochs to train.')
+    parser.add_argument('-r', type=int, default=0, help='输入1追踪路径')
+    parser.add_argument('-t', type=int, default=128, help='设置ttl存活数量')
+
+
     args = parser.parse_args()
-    #print(2)
-    print(args.pi)
-    print(args.c)
-    ping(args.pi,args.c,args.q,args.i,args.I)
+    ping(args.pi,args.c,args.q,args.i,args.I,args.r,args.t)
