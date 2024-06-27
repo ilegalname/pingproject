@@ -4,11 +4,7 @@ import struct
 import socket
 import select
 import argparse
-
 from random import randint
-#from scapy.all import *
-import ipaddress,threading
-from optparse import OptionParser
 from scapy.all import *
 
 def chesksum(data):
@@ -28,12 +24,13 @@ def chesksum(data):
     return answer
 
 
-def request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body):
+def request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body,lenth):
     #  把字节打包成二进制数据
-    icmp_packet = struct.pack('>BBHHH32s', data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body)
+    format_string=f'>BBHHH{lenth}s'
+    icmp_packet = struct.pack(format_string, data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body)
     icmp_chesksum = chesksum(icmp_packet)  # 获取校验和
     #  把校验和传入，再次打包
-    icmp_packet = struct.pack('>BBHHH32s', data_type, data_code, icmp_chesksum, data_ID, data_Sequence, payload_body)
+    icmp_packet = struct.pack(format_string, data_type, data_code, icmp_chesksum, data_ID, data_Sequence, payload_body)
     return icmp_packet
 
 
@@ -48,9 +45,6 @@ def raw_socket(dst_addr, icmp_packet,host):
     # 发送数据到网络
     host_addr = socket.gethostbyname(host)
     rawsocket.bind((host_addr,0))
-    local_ip,local_port=rawsocket.getsockname()
-    #print(local_ip)
-    #print(local_port)S
     rawsocket.sendto(icmp_packet, (dst_addr, 80))
     # 返回数据
     return send_request_ping_time, rawsocket, dst_addr
@@ -124,7 +118,7 @@ def TraceRouteTTL(r,dstn,timetolive=128):
         return 0
 
 
-def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128):
+def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample=''):
     send, accept, lost = 0, 0, 0
     sumtime, shorttime, longtime, avgtime = 0, 1000, 0, 0
     # TODO icmp数据包的构建
@@ -133,25 +127,35 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128):
     data_checksum = 0  # "...with value 0 substituted for this field..."
     data_ID = 0  # Identifier
     data_Sequence = 1  # Sequence number
-    payload_body = b'abcdefghijklmnopqrstuvwabcdefghi'  # data
+    if(sample!=''):
+        nums=lenth//len(sample)
+        databody = sample * nums
+        print(databody)
+        #payload_body = ''.join(format(ord(char), '08b') for char in databody)
+        payload_body = b'{databody}'
+    #print(payload_body)
+    else:
+        payload_body = b'abcdefghijklmnopqrstuvwabcdefghi'  # data
+        print(payload_body)
     # 将主机名转ipv4地址格式，返回以ipv4地址格式的字符串，如果主机名称是ipv4地址，则它将保持不变
     dst_addr = socket.gethostbyname(dstn)
-    print("正在 Ping {0} [{1}] 具有 32 字节的数据:".format(dstn, dst_addr))
+    print("正在 Ping {0} [{1}] 具有 {2} 字节的数据:".format(dstn, dst_addr, lenth))
     reach=TraceRouteTTL(route,dstn,timetolive)
     for i in range(0, n):
         if(reach==0):
             print("can't reach, TTL is too small")
             return 0
+        #return 0
         send = i + 1
         # 请求ping数据包的二进制转换
-        icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body)
+        icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body, lenth)
         # 连接套接字,并将数据发送到套接字
         send_request_ping_time, rawsocket, addr = raw_socket(dst_addr, icmp_packet,host)
         # 数据包传输时间
         times = reply_ping(send_request_ping_time, rawsocket, data_Sequence + i)
         if times > 0:
             if q == 0:
-                print("来自 {0} 的回复: 字节=32 时间={1}ms".format(addr, int(times * 1000)))
+                print("来自 {0} 的回复: 字节={1} 时间={2}ms".format(addr,lenth,int(times * 1000)))
 
             accept += 1
             return_time = int(times * 1000)
@@ -176,14 +180,15 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128):
 if __name__ == "__main__":
     #i = input("请输入要ping的主机或域名\n")
     parser = argparse.ArgumentParser(description='test')
-    parser.add_argument('-pi', type=str, help='输入想ping的ip地址')
+    parser.add_argument('-ip', type=str, help='输入想ping的ip地址')
     parser.add_argument('-c', type=int, default=4, help='输入想ping的次数')
     parser.add_argument('-q', type=int, default=0, help='输入1只显示最后结果')
     parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数') 
     parser.add_argument('-I', type=str, default='', help='输入发送端ip')
     parser.add_argument('-r', type=int, default=0, help='输入1追踪路径')
     parser.add_argument('-t', type=int, default=128, help='设置ttl存活数量')
-
+    parser.add_argument('-s', type=int, default=56, help='设置想发送的数据包大小')
+    parser.add_argument('-p', type=str, default='', help='设置想发送的范本样式')
 
     args = parser.parse_args()
-    ping(args.pi,args.c,args.q,args.i,args.I,args.r,args.t)
+    ping(args.ip,args.c,args.q,args.i,args.I,args.r,args.t,args.s,args.p)
