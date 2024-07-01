@@ -26,7 +26,7 @@ def chesksum(data):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
-def chesksum_six(data):
+def checksum_six(data):
     """计算校验和"""
     if len(data) % 2:
         data += b'\x00'
@@ -34,17 +34,26 @@ def chesksum_six(data):
     s = (s >> 16) + (s & 0xffff)
     s += s >> 16
     return ~s & 0xffff
+# def checksum_six(msg):
+#     s = 0
+#     for i in range(0, len(msg), 2):
+#         w = ord(msg[i]) + (ord(msg[i + 1]) << 8)
+#         s = ((s+w) & 0xffff) + ((s+w) >> 16)
+#     return ~s & 0xffff
 
 def request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body,lenth,ipv):
     #  把字节打包成二进制数据
-    format_string=f'>BBHHH{lenth}s'
-    icmp_packet = struct.pack(format_string, data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body)
     if(ipv==4):
+        format_string=f'>BBHHH{lenth}s'
+        icmp_packet = struct.pack(format_string, data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body)
         icmp_chesksum = chesksum(icmp_packet)  # 获取校验和
+        icmp_packet = struct.pack(format_string, data_type, data_code, icmp_chesksum, data_ID, data_Sequence, payload_body)
     else:
-        icmp_chesksum = chesksum_six(icmp_packet)
+        format_string=f'>BBHLL{lenth}s'
+        icmp_packet = struct.pack(format_string, data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body)
+        icmp_chesksum = checksum_six(icmp_packet)
+        icmp_packet = struct.pack(format_string, data_type, data_code, icmp_chesksum, data_ID, data_Sequence, payload_body)
     #  把校验和传入，再次打包
-    icmp_packet = struct.pack(format_string, data_type, data_code, icmp_chesksum, data_ID, data_Sequence, payload_body)
     return icmp_packet
 
 
@@ -63,8 +72,9 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
     # 发送数据到网络
     if(n==6):
         host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[0][4][0]
-        #rawsocket.bind((host_addr, 0, 0, 0))
-        rawsocket.sendto(icmp_packet, (dst_addr, 0))
+        rawsocket.bind((host_addr, 0, 0, 0))
+        sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0,0,0))
+        print(sendt)
     else:
         host_addr = socket.gethostbyname(host)
         rawsocket.bind((host_addr,0))
@@ -186,11 +196,11 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
         #dst_addr = addr_info[4][0]
         dst_addr=resolve_ipv6_dns(dstn)
     print("正在 Ping {0} [{1}] 具有 {2} 字节的数据:".format(dstn, dst_addr, lenth))
-    #reach=TraceRouteTTL(route,dstn,timetolive)
+    # reach=TraceRouteTTL(route,dstn,timetolive)
     for i in range(0, n):
-        #if(reach==0):
-            #print("can't reach, TTL is too small")
-            #return 0
+        # if(reach==0):
+        #     print("can't reach, TTL is too small")
+        #     return 0
         send = i + 1
         # 请求ping数据包的二进制转换
         icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body, lenth, ipv)
