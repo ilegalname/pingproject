@@ -72,9 +72,11 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
     # 发送数据到网络
     if(n==6):
         host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[0][4][0]
-        rawsocket.bind((host_addr, 0, 0, 0))
-        sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0,0,0))
-        print(sendt)
+        host_addr = "2408:8409:2482:5255:9831:b5e4:d7c1:8d20"
+        rawsocket.bind((host_addr, 0))
+        # print
+        sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0))
+        # print(sendt)
     else:
         host_addr = socket.gethostbyname(host)
         rawsocket.bind((host_addr,0))
@@ -83,7 +85,7 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
     return send_request_ping_time, rawsocket, dst_addr
 
 
-def reply_ping(send_request_ping_time, rawsocket, data_Sequence, timeout=2):
+def reply_ping(send_request_ping_time, rawsocket, data_Sequence, ipv, timeout=2):
     while True:
         # 开始时间
         started_select = time.time()
@@ -98,20 +100,26 @@ def reply_ping(send_request_ping_time, rawsocket, data_Sequence, timeout=2):
         time_received = time.time()
         # 设置接收的包的字节为1024
         received_packet, addr = rawsocket.recvfrom(1024)
-        #if(received_packet.haslayer(IP)):
-        #ttl=str(received_packet.ttl,encoding='utf-8')
-        #print("TTL={0}".format(ttl))
-        # 获取接收包的icmp头
-        # print(icmpHeader)
-        icmpHeader = received_packet[20:28]
-        # 反转编码
-        type, code, checksum, packet_id, sequence = struct.unpack(
-            ">BBHHH", icmpHeader
-        )
-
-        if type == 0 and sequence == data_Sequence:
-            return time_received - send_request_ping_time
-
+        rep=received_packet[0:1]
+        re=struct.unpack("B",rep)
+        # print(re)
+        #print(type(re))
+        #print(hex(re))
+        if(ipv==6):
+            # print("here")
+            icmpv6Header = received_packet[0:12]
+            # 反转编码
+            re_type, code, checksum, packet_id, sequence = struct.unpack(">BBHLL", icmpv6Header)
+            # print(re_type)
+            if re_type == 129 and sequence == data_Sequence:
+                return time_received - send_request_ping_time
+        else:
+            # print("here!!")
+            icmpHeader = received_packet[20:28]
+            # 反转编码
+            re_type, code, checksum, packet_id, sequence = struct.unpack(">BBHHH", icmpHeader)
+            if re_type == 0 and sequence == data_Sequence:
+                return time_received - send_request_ping_time
         # 数据包的超时时间判断
         timeout = timeout - wait_for_time
         if timeout <= 0:
@@ -181,7 +189,7 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
     if(sample!=''):
         nums=lenth//len(sample)
         databody = sample * nums
-        print(databody)
+        #print(databody)
         payload_body = b'{databody}'
     #print(payload_body)
     else:
@@ -207,7 +215,8 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
         # 连接套接字,并将数据发送到套接字
         send_request_ping_time, rawsocket, addr = raw_socket(dst_addr, icmp_packet,host,ipv)
         # 数据包传输时间
-        times = reply_ping(send_request_ping_time, rawsocket, data_Sequence + i)
+        #print("ipv={0}".format(ipv))
+        times = reply_ping(send_request_ping_time, rawsocket, data_Sequence + i,ipv)
         if times > 0:
             if q == 0:
                 print("来自 {0} 的回复: 字节={1} 时间={2}ms".format(addr,lenth,int(times * 1000)))
