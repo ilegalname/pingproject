@@ -1,5 +1,6 @@
 # encoding:utf-8
 import ipaddress
+import random
 import time
 import struct
 import socket
@@ -56,9 +57,33 @@ def request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, pa
     #  把校验和传入，再次打包
     return icmp_packet
 
-def chose_ipv6(host):
+def chose_ipv6(host,rawsocket,icmp_packet,dst_addr):
     addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
+    host_addr_list = list()
+    for addr in addr_info_list:
+        host_addr_list.append(addr[4][0])
+    random.shuffle(host_addr_list)
+    #print(host_addr_list)
 
+    for addr in host_addr_list:
+        try:
+            # udp_server_sock.bind(0)
+            host_addr = addr
+            #print("host:",host_addr)
+            #print("dst:",dst_addr)
+            #print("packet:",icmp_packet)
+            rawsocket.bind(host_addr)
+        except Exception as a:
+            #print("ERROR1:",a)
+            print(" ")
+        try:
+            sendt = rawsocket.sendto(icmp_packet, (dst_addr, 0))
+            if (sendt > 0):
+                #print(sendt)
+                #print("break")
+                return
+        except Exception as b:
+            print("ERROR2:",b)
 
 def raw_socket(dst_addr, icmp_packet,host,n=4):
     '''
@@ -74,6 +99,7 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
     send_request_ping_time = time.time()
     # 发送数据到网络
     if(n==6):
+        chose_ipv6(host, rawsocket, icmp_packet, dst_addr)
         #host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[0][4][0]
         #addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
         #print(addr_info_list)
@@ -82,24 +108,26 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
         #host_addr = "2408:8409:2482:5255:9910:1ac:14a3:61cf"
         #rawsocket.bind((host_addr, 0))
         # print
-        i = 0
-        addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
-        #le= len(addr_info_list)
-        for addr in addr_info_list:
-            #host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[i][4][0]
-            host_addr = addr[4][0]
-            #print(i)
-            print(host_addr)
-            try:
-                #udp_server_sock.bind(0)
-                rawsocket.bind((host_addr, len(host_addr)))
-                sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0,0,0))
-            except Exception as e:
-                i = i + 1
-                print(e)
-                continue
-            if(sendt>0):
-                break
+        # i = 3
+        # addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
+        # #le= len(addr_info_list)
+        # for i in range(len(addr_info_list)):
+        #     print(i)
+        #     host_addr = addr_info_list[i][4][0]
+        #     try:
+        #         #udp_server_sock.bind(0)
+        #         rawsocket.bind((host_addr, 0))
+        #         sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0))
+        #         print(sendt)
+        #         if (sendt > 0):
+        #             print("break")
+        #             break
+        #     except Exception as e:
+        #         i = i + 1
+        #         print(i)
+        #         print(e)
+        #         #continue
+
     else:
         host_addr = socket.gethostbyname(host)
         rawsocket.bind((host_addr,0))
