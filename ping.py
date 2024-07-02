@@ -262,11 +262,10 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
                     i + 1, accept, i + 1 - accept, (i + 1 - accept) / (i + 1) * 100, shorttime, longtime,
                     sumtime / send))
 
-
 if __name__ == "__main__":
     #i = input("请输入要ping的主机或域名\n")
     parser = argparse.ArgumentParser(description='test')
-    parser.add_argument('-ip', type=str, help='输入想ping的ip地址')
+    parser.add_argument('-ip', type=str, help='输入想ping的ip地址，如果有多个，用‘/’分割')
     parser.add_argument('-c', type=int, default=4, help='输入想ping的次数')
     parser.add_argument('-q', type=int, default=0, help='输入1只显示最后结果')
     parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数') 
@@ -279,4 +278,8 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    ping(args.ip,args.c,args.q,args.i,args.I,args.r,args.t,args.s,args.p,args.ipv)
+    String = args.ip
+    ips=String.split('/')
+    for ip in ips:
+        ping(ip,args.c,args.q,args.i,args.I,args.r,args.t,args.s,args.p,args.ipv)
+        print("\n")
