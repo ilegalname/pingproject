@@ -56,6 +56,9 @@ def request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, pa
     #  把校验和传入，再次打包
     return icmp_packet
 
+def chose_ipv6(host):
+    addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
+
 
 def raw_socket(dst_addr, icmp_packet,host,n=4):
     '''
@@ -71,12 +74,32 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
     send_request_ping_time = time.time()
     # 发送数据到网络
     if(n==6):
-        host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[0][4][0]
-        host_addr = "2408:8409:2482:5255:9831:b5e4:d7c1:8d20"
-        rawsocket.bind((host_addr, 0))
+        #host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[0][4][0]
+        #addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
+        #print(addr_info_list)
+        #print(host_addr)
+        #host_addr = "2408:8409:2482:5255:9831:b5e4:d7c1:8d20"
+        #host_addr = "2408:8409:2482:5255:9910:1ac:14a3:61cf"
+        #rawsocket.bind((host_addr, 0))
         # print
-        sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0))
-        # print(sendt)
+        i = 0
+        addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
+        #le= len(addr_info_list)
+        for addr in addr_info_list:
+            #host_addr = socket.getaddrinfo(host, None, socket.AF_INET6)[i][4][0]
+            host_addr = addr[4][0]
+            #print(i)
+            print(host_addr)
+            try:
+                #udp_server_sock.bind(0)
+                rawsocket.bind((host_addr, len(host_addr)))
+                sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0,0,0))
+            except Exception as e:
+                i = i + 1
+                print(e)
+                continue
+            if(sendt>0):
+                break
     else:
         host_addr = socket.gethostbyname(host)
         rawsocket.bind((host_addr,0))
@@ -189,7 +212,6 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
     if(sample!=''):
         nums=lenth//len(sample)
         databody = sample * nums
-        #print(databody)
         payload_body = b'{databody}'
     #print(payload_body)
     else:
