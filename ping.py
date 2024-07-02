@@ -10,6 +10,7 @@ from random import randint
 from scapy.all import *
 import array
 import dns.resolver
+import itertools
 
 def chesksum(data):
     n = len(data)
@@ -107,31 +108,13 @@ def raw_socket(dst_addr, icmp_packet,host,n=4):
         #host_addr = "2408:8409:2482:5255:9831:b5e4:d7c1:8d20"
         #host_addr = "2408:8409:2482:5255:9910:1ac:14a3:61cf"
         #rawsocket.bind((host_addr, 0))
-        # print
-        # i = 3
-        # addr_info_list = socket.getaddrinfo(host, None, socket.AF_INET6)
-        # #le= len(addr_info_list)
-        # for i in range(len(addr_info_list)):
-        #     print(i)
-        #     host_addr = addr_info_list[i][4][0]
-        #     try:
-        #         #udp_server_sock.bind(0)
-        #         rawsocket.bind((host_addr, 0))
-        #         sendt=rawsocket.sendto(icmp_packet, (dst_addr, 0))
-        #         print(sendt)
-        #         if (sendt > 0):
-        #             print("break")
-        #             break
-        #     except Exception as e:
-        #         i = i + 1
-        #         print(i)
-        #         print(e)
-        #         #continue
-
     else:
         host_addr = socket.gethostbyname(host)
-        rawsocket.bind((host_addr,0))
-        rawsocket.sendto(icmp_packet, (dst_addr, 80))
+        print(host)
+        #rawsocket.bind(("192.168.221.1",0))
+        print(dst_addr)
+        sendt=rawsocket.sendto(icmp_packet, (dst_addr, 80))
+        print(sendt)
     # 返回数据
     return send_request_ping_time, rawsocket, dst_addr
 
@@ -221,7 +204,52 @@ def resolve_ipv6_dns(host):
         print(f"Error resolving {host}: {e}")
         return None
 
-def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',ipv=4):
+def ping_net(net_addr,host_addr,numb):
+    print(net_addr)
+    nets = net_addr.split('.')
+    print(nets)
+    net_a = ''
+    for net in nets:
+        print(net)
+        net = int(net)
+        net_b = '{:08b}'.format(net)
+        net_a += net_b
+        print(net_a)    #net_a为二进制网络号
+    pos = net_a.rfind('1')
+    print(pos)
+    num = 32-int(pos)-1    #有多少位为0
+    #s = list(itertools.product(range(2), repeat=num))
+    s = list(itertools.product(range(2), repeat=32-int(numb)))
+    #net_c = net_a[:-num]   #前几位不变
+    net_c = net_a[:-(32-int(numb))]
+    print(net_c)
+    cnt = 0
+    for small in s:
+        ss1 = ''.join(map(str, small))
+        nnet = net_c + ss1     #获取子网ip
+        print(nnet)
+        ip1 = nnet[0:8]
+        print("ip1:",ip1)
+        ip2 = nnet[8:16]
+        print("ip2:", ip2)
+        ip3 = nnet[16:24]
+        print("ip3:", ip3)
+        ip4 = nnet[24:32]
+        print("ip4:", ip4)
+        i1 = int(ip1, 2)
+        i2 = int(ip2,2)
+        i3 = int(ip3,2)
+        i4 = int(ip4,2)
+        sub_ip = str(i1) + '.' + str(i2) + '.' + str(i3) + '.' + str(i4)
+        ping_num=ping(sub_ip,1,0,0.7,host_addr,0,128,1,56,'',4)
+        if(ping_num == 23):
+            cnt += 1
+        else:
+            cnt=cnt
+    print("在当前网络号{0}中，共有{1}个子网可以ping通".format(net_addr,cnt))
+
+
+def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sample='',ipv=4):
     send, accept, lost = 0, 0, 0
     sumtime, shorttime, longtime, avgtime = 0, 1000, 0, 0
     # TODO icmp数据包的构建
@@ -246,19 +274,20 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
         payload_body = b'abcdefghijklmnopqrstuvwabcdefghi'  # data
     # 将主机名转ipv4地址格式，返回以ipv4地址格式的字符串，如果主机名称是ipv4地址，则它将保持不变\
     if(ipv==4):
-        dst_addr = socket.gethostbyname(dstn)
+        #dst_addr = socket.gethostbyname(dstn)
+        if(ifnet==1):
+            dst_addr=dstn
+        else:
+            dst_addr = socket.gethostbyname(dstn)
     else:
-        #dst_ad = socket.gethostbyname(dstn)
-        #dst_addr = ipaddress.IPv6Address('::ffff:' + dst_ad)
-        #addr_info = socket.getaddrinfo(dstn, None, socket.AF_INET6)[0]
-        #dst_addr = addr_info[4][0]
         dst_addr=resolve_ipv6_dns(dstn)
     print("正在 Ping {0} [{1}] 具有 {2} 字节的数据:".format(dstn, dst_addr, lenth))
-    # reach=TraceRouteTTL(route,dstn,timetolive)
+    #reach=TraceRouteTTL(route,dstn,timetolive)
     for i in range(0, n):
-        # if(reach==0):
-        #     print("can't reach, TTL is too small")
-        #     return 0
+        #if(reach==0):
+             #print("can't reach, TTL is too small")
+             #return 0
+        numm=0
         send = i + 1
         # 请求ping数据包的二进制转换
         icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body, lenth, ipv)
@@ -270,6 +299,7 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
         if times > 0:
             if q == 0:
                 print("来自 {0} 的回复: 字节={1} 时间={2}ms".format(addr,lenth,int(times * 1000)))
+                numm=23
 
             accept += 1
             return_time = int(times * 1000)
@@ -289,11 +319,13 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,lenth=56,sample='',i
                 "\t数据包：已发送={0},接收={1}，丢失={2}（{3}%丢失），\n往返行程的估计时间（以毫秒为单位）：\n\t最短={4}ms，最长={5}ms，平均={6}ms".format(
                     i + 1, accept, i + 1 - accept, (i + 1 - accept) / (i + 1) * 100, shorttime, longtime,
                     sumtime / send))
+        return numm
 
 if __name__ == "__main__":
     #i = input("请输入要ping的主机或域名\n")
     parser = argparse.ArgumentParser(description='test')
     parser.add_argument('-ip', type=str, help='输入想ping的ip地址，如果有多个，用‘/’分割')
+    parser.add_argument('-net', type=str, default='', help='输入网络号‘/’掩码位数，对其所有ip进行检查')
     parser.add_argument('-c', type=int, default=4, help='输入想ping的次数')
     parser.add_argument('-q', type=int, default=0, help='输入1只显示最后结果')
     parser.add_argument('-i', type=int, default=0, help='输入想间隔的秒数') 
@@ -304,10 +336,18 @@ if __name__ == "__main__":
     parser.add_argument('-p', type=str, default='', help='设置想发送的范本样式')
     parser.add_argument('-ipv', type=int, default=4, help='输入4使用Ipv4，输入6使用Ipv6')
 
-
     args = parser.parse_args()
-    String = args.ip
-    ips=String.split('/')
-    for ip in ips:
-        ping(ip,args.c,args.q,args.i,args.I,args.r,args.t,args.s,args.p,args.ipv)
-        print("\n")
+
+    if(args.net!=''):
+        ips = args.net.split('/')
+        net = ips[0]
+        print(net)
+        numb = ips[1]
+        print(numb)
+        ping_net(net,args.I,numb)
+    else:
+        String = args.ip
+        ips=String.split('/')
+        for ip in ips:
+            ping(ip,args.c,args.q,args.i,args.I,args.r,args.t,0,args.s,args.p,args.ipv)
+            print("\n")
