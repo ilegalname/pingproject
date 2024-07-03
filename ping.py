@@ -11,6 +11,8 @@ from scapy.all import *
 import array
 import dns.resolver
 import itertools
+import sys
+import telnetlib
 
 def chesksum(data):
     n = len(data)
@@ -134,8 +136,9 @@ def reply_ping(send_request_ping_time, rawsocket, data_Sequence, ipv, timeout=2)
         time_received = time.time()
         # 设置接收的包的字节为1024
         received_packet, addr = rawsocket.recvfrom(1024)
-        rep=received_packet[0:1]
-        re=struct.unpack("B",rep)
+        print()
+
+        #re=struct.unpack("B",rep)
         # print(re)
         #print(type(re))
         #print(hex(re))
@@ -223,6 +226,7 @@ def ping_net(net_addr,host_addr,numb):
     #net_c = net_a[:-num]   #前几位不变
     net_c = net_a[:-(32-int(numb))]
     print(net_c)
+    count = pow(2,32-int(numb))
     cnt = 0
     for small in s:
         ss1 = ''.join(map(str, small))
@@ -246,12 +250,42 @@ def ping_net(net_addr,host_addr,numb):
             cnt += 1
         else:
             cnt=cnt
-    print("在当前网络号{0}中，共有{1}个子网可以ping通".format(net_addr,cnt))
+    print("在当前网络号{0}中，共有{1}个子网,其中有{2}个可以ping通".format(net_addr,count,cnt))
 
+
+def telnet(host, port):
+    """
+    测试端口号通不通
+    :return:
+    """
+    try:
+        #  timeout单位s
+        telnetlib.Telnet(host=host, port=port, timeout=2)
+        print(f"{port}  端口开放")
+    except:
+        print(f"{port}  端口未开放")
+        # 或什么都不打印
+        # pass
+
+
+def for_port(dst_ip, port):
+    """
+    添加端口到列表中
+    使用示例: python3 telnet_for.py 39.105.137.91 81 82 83 84
+    :return:
+    """
+    dst_addr = socket.gethostbyname(dst_ip)
+
+    port_list = port
+    if not len(port_list):
+        port_list = [20, 21, 22, 53, 80, 8080, 443, 8443, 8888, 3306, 3389]
+    for port in port_list:
+        telnet(dst_addr, port)
 
 def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sample='',ipv=4):
     send, accept, lost = 0, 0, 0
     sumtime, shorttime, longtime, avgtime = 0, 1000, 0, 0
+    print(n)
     # TODO icmp数据包的构建
     if(ipv==4):
         data_type = 8  # ICMP Echo Request
@@ -279,15 +313,18 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
             dst_addr=dstn
         else:
             dst_addr = socket.gethostbyname(dstn)
+            print(dst_addr)
     else:
         dst_addr=resolve_ipv6_dns(dstn)
     print("正在 Ping {0} [{1}] 具有 {2} 字节的数据:".format(dstn, dst_addr, lenth))
     #reach=TraceRouteTTL(route,dstn,timetolive)
+    numm = 0
     for i in range(0, n):
+        print(n)
         #if(reach==0):
              #print("can't reach, TTL is too small")
              #return 0
-        numm=0
+
         send = i + 1
         # 请求ping数据包的二进制转换
         icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body, lenth, ipv)
@@ -319,7 +356,7 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
                 "\t数据包：已发送={0},接收={1}，丢失={2}（{3}%丢失），\n往返行程的估计时间（以毫秒为单位）：\n\t最短={4}ms，最长={5}ms，平均={6}ms".format(
                     i + 1, accept, i + 1 - accept, (i + 1 - accept) / (i + 1) * 100, shorttime, longtime,
                     sumtime / send))
-        return numm
+    return numm
 
 if __name__ == "__main__":
     #i = input("请输入要ping的主机或域名\n")
@@ -335,6 +372,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', type=int, default=56, help='设置想发送的数据包大小')
     parser.add_argument('-p', type=str, default='', help='设置想发送的范本样式')
     parser.add_argument('-ipv', type=int, default=4, help='输入4使用Ipv4，输入6使用Ipv6')
+    parser.add_argument("-test_port", type=str, default='', help="输入想检查端口号的ip地址")
 
     args = parser.parse_args()
 
@@ -345,6 +383,12 @@ if __name__ == "__main__":
         numb = ips[1]
         print(numb)
         ping_net(net,args.I,numb)
+    elif(args.test_port!=''):
+        netport = args.test_port.split(' ')
+        ip_ad = netport[0]
+        print(ip_ad)
+        del netport[0]
+        for_port(ip_ad, netport)
     else:
         String = args.ip
         ips=String.split('/')
