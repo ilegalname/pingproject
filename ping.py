@@ -1,4 +1,5 @@
 # encoding:utf-8
+import concurrent.futures.thread
 import ipaddress
 import time
 import struct
@@ -12,6 +13,8 @@ import dns.resolver
 import itertools
 import sys
 import telnetlib
+import thread
+from concurrent.futures import ThreadPoolExecutor
 
 def chesksum(data):
     n = len(data)
@@ -195,6 +198,7 @@ def resolve_ipv6_dns(host):
         print(f"Error resolving {host}: {e}")
         return None
 
+
 def ping_net(net_addr,host_addr,numb):
     nets = net_addr.split('.')
     net_a = ''
@@ -206,27 +210,57 @@ def ping_net(net_addr,host_addr,numb):
     num = 32-int(pos)-1    #有多少位为0
     #s = list(itertools.product(range(2), repeat=num))
     s = list(itertools.product(range(2), repeat=32-int(numb)))
-    #net_c = net_a[:-num]   #前几位不变
+    # print(s)  #主机号
     net_c = net_a[:-(32-int(numb))]
+    # print(net_a)
+    # print(net_c)
+    params_2=[net_c + ''.join(map(str, i)) for i in s]
+    # print(params_2)
+    params=[str(int(i[0:8], 2)) + '.' + str(int(i[8:16], 2)) + '.' + str(int(i[16:24], 2)) + '.' + str(int(i[24:32], 2)) for i in params_2]
+    # print(params)
+    # print(param)
+    # for i in params:
+    #     l=
+    t=[[1,0,0.7,host_addr,0,128,1,56,'',4]]*len(params)
+    t1 = [1]*len(params)
+    t2 = [1] * len(params)
+    t3 = [0.7] * len(params)
+    t4 = [host_addr] * len(params)
+    t5 = [0] * len(params)
+    t6 = [128] * len(params)
+    t7 = [1] * len(params)
+    t8 = [56] * len(params)
+    t9 = [''] * len(params)
+    t10 = [4] * len(params)
+
+    # print(t)
+    params3=[params,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10]
+    #print(params3)
+
+    # p=[[i]+t[:] for i in params]
+    #print(p)
+
     count = pow(2,32-int(numb))
     cnt = 0
-    for small in s:
-        ss1 = ''.join(map(str, small))
-        nnet = net_c + ss1     #获取子网ip
-        ip1 = nnet[0:8]
-        ip2 = nnet[8:16]
-        ip3 = nnet[16:24]
-        ip4 = nnet[24:32]
-        i1 = int(ip1, 2)
-        i2 = int(ip2,2)
-        i3 = int(ip3,2)
-        i4 = int(ip4,2)
-        sub_ip = str(i1) + '.' + str(i2) + '.' + str(i3) + '.' + str(i4)
-        ping_num=ping(sub_ip,1,0,0.7,host_addr,0,128,1,56,'',4)
-        if(ping_num == 23):
-            cnt += 1
-        else:
-            cnt=cnt
+    # for small in s:
+    #     # ss1 = ''.join(map(str, small))
+    #     # nnet = net_c + ss1     #获取子网ip
+    #     # sub_ip = str(int(nnet[0:8], 2)) + '.' + str(int(nnet[8:16], 2)) + '.' + str(int(nnet[16:24], 2)) + '.' + str(int(nnet[24:32], 2))
+    # executor = concurrent.futures.thread.ThreadPoolExecutor(max_workers=100)
+    # result =
+
+    with ThreadPoolExecutor(max_workers=100) as t:
+        results = t.map(ping, *params3)
+    #     #ping_num=ping(sub_ip,1,0,0.7,host_addr,0,128,1,56,'',4)
+    #     print(f"task1: {task1.done()}")
+    # ping_num = task1.re
+        # sult()
+        for i in results:
+            # print(i)
+            if(i == 23):
+                cnt += 1
+    #     else:
+    #         cnt=cnt
     print("在当前网络号{0}中，共有{1}个子网,其中有{2}个可以ping通".format(net_addr,count,cnt))
 
 
@@ -259,6 +293,26 @@ def for_port(dst_ip, port):
     for port in port_list:
         telnet(dst_addr, port)
 
+def tr_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body, lenth,
+                               ipv,tr,dst_addr,host):
+    icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence, payload_body, lenth,
+                               ipv)
+    if (tr == 1):
+        print("正在构建数据包")
+    # 连接套接字,并将数据发送到套接字
+    send_request_ping_time, rawsocket, addr = raw_socket(dst_addr, icmp_packet, host, ipv)
+    if (tr == 1):
+        print("正在创建套接字")
+        print("正在将协议发到网上")
+        print("正在接收数据包")
+    # 数据包传输时间
+    # print("ipv={0}".format(ipv))
+    times = reply_ping(send_request_ping_time, rawsocket, data_Sequence, ipv)
+    return times,addr
+
+def muli_ping(number,dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sample='',ipv=4,tr=0):
+    ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sample='',ipv=4,tr=0)
+
 def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sample='',ipv=4,tr=0):
     send, accept, lost = 0, 0, 0
     sumtime, shorttime, longtime, avgtime = 0, 1000, 0, 0
@@ -279,7 +333,7 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
         data_Sequence = 1  # Sequence number
         if (tr == 1):
             print("正在构建icmpv6包头")
-    if(sample!=''):
+    if sample!='':
         nums=lenth//len(sample)
         databody = sample * nums
         #payload_body = b'{databody}'
@@ -287,7 +341,7 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
     else:
         payload_body = b'abcdefghijklmnopqrstuvwabcdefghi'  # data
     # 将主机名转ipv4地址格式，返回以ipv4地址格式的字符串，如果主机名称是ipv4地址，则它将保持不变\
-    if(ipv==4):
+    if ipv==4:
         if(ifnet==1):
             dst_addr=dstn
         else:
@@ -298,11 +352,13 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
         dst_addr=resolve_ipv6_dns(dstn)
         if (tr == 1):
             print("正在解析地址")
-    print("正在 Ping {0} [{1}] 具有 {2} 字节的数据:".format(dstn, dst_addr, lenth))
-    if(route==1):
+    if ifnet==0:
+        print("正在 Ping {0} [{1}] 具有 {2} 字节的数据:".format(dstn, dst_addr, lenth))
+    if route==1:
         TraceRouteTTL(route,dstn,timetolive)
     numm = 0
     reach = ttl_restrict(dstn,timetolive);
+    #print(n)
     for i in range(0, n):
         if(timetolive!=128):
             if(reach==0):
@@ -310,22 +366,14 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
                  return 0
         send = i + 1
         # 请求ping数据包的二进制转换
-        icmp_packet = request_ping(data_type, data_code, data_checksum, data_ID, data_Sequence + i, payload_body, lenth, ipv)
-        if(tr==1):
-            print("正在构建数据包")
-        # 连接套接字,并将数据发送到套接字
-        send_request_ping_time, rawsocket, addr = raw_socket(dst_addr, icmp_packet,host,ipv)
-        if (tr == 1):
-            print("正在创建套接字")
-            print("正在将协议发到网上")
-            print("正在接收数据包")
-        # 数据包传输时间
-        #print("ipv={0}".format(ipv))
-        times = reply_ping(send_request_ping_time, rawsocket, data_Sequence + i,ipv)
+        times,addr = tr_ping(data_type, data_code, data_checksum, data_ID, data_Sequence+i, payload_body, lenth,
+                ipv, tr, dst_addr, host)
         if times > 0:
+            if ifnet == 1:
+                print(dst_addr," online")
+                numm=23
             if q == 0:
                 print("来自 {0} 的回复: 字节={1} 时间={2}ms".format(addr,lenth,int(times * 1000)))
-                numm=23
             accept += 1
             return_time = int(times * 1000)
             sumtime += return_time
@@ -336,8 +384,11 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
             time.sleep(ti)
         else:
             lost += 1
-            print("请求超时。")
-        if send == n:
+            if(ifnet == 0):
+                print("请求超时。")
+            elif ifnet==1:
+                print(dst_addr, "offline")
+        if send == n and ifnet != 1:
             print("{0}的Ping统计信息:".format(dst_addr))
             print(
                 "\t数据包：已发送={0},接收={1}，丢失={2}（{3}%丢失），\n往返行程的估计时间（以毫秒为单位）：\n\t最短={4}ms，最长={5}ms，平均={6}ms".format(
