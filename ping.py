@@ -1,6 +1,5 @@
 # encoding:utf-8
 import ipaddress
-import random
 import time
 import struct
 import socket
@@ -283,7 +282,8 @@ def ping(dstn,n=4,q=0,ti=0.7,host="",route=0,timetolive=128,ifnet=0,lenth=56,sam
     if(sample!=''):
         nums=lenth//len(sample)
         databody = sample * nums
-        payload_body = b'{databody}'
+        #payload_body = b'{databody}'
+        payload_body = bytes(databody,encoding="utf8")
     else:
         payload_body = b'abcdefghijklmnopqrstuvwabcdefghi'  # data
     # 将主机名转ipv4地址格式，返回以ipv4地址格式的字符串，如果主机名称是ipv4地址，则它将保持不变\
