@@ -13,7 +13,7 @@ import dns.resolver
 import itertools
 import sys
 import telnetlib
-import thread
+# import thread
 from concurrent.futures import ThreadPoolExecutor
 
 def chesksum(data):
